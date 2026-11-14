@@ -5,7 +5,7 @@
 import tkinter as tk
 import backend_urna as backend
 
-PORTA_PADRAO = "/dev/ttyACM0"
+PORTA_PADRAO = "COM7"
 
 # Mensagem mostrada na tela para cada resposta do backend
 MENSAGENS = {

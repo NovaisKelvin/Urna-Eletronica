@@ -60,16 +60,16 @@ def zerar_votos():
 # ---------------------------------------------------------------
 # AS TRES ACOES DA URNA
 # Cada uma devolve um codigo de resposta (texto) que tambem e enviado ao Arduino.
-# ---------------------------------------------------------------
 
+# ---------------------------------------------------------------
 def digitar(digito):
-    """Acrescenta um digito ao numero (maximo 2 digitos). So funciona com a aquisicao ativa."""
     global numero_digitado, ultima_resposta
     if not aquisicao_ativa:
         ultima_resposta = "PARADA"
         return
     if len(numero_digitado) < 2:
         numero_digitado = numero_digitado + digito
+        enviar_ao_arduino("NUM:" + numero_digitado)
 
 
 def confirmar():
@@ -127,16 +127,18 @@ def executar(comando):
 def conectar(porta, velocidade=9600):
     """Abre a porta Serial. Retorna True se conectou."""
     global conexao, estado_comunicacao
+
     if serial is None:
         estado_comunicacao = "Falha: pyserial nao instalado"
         return False
     try:
-        conexao = serial.Serial(porta, velocidade, timeout=0.1)
+        conexao = serial.Serial(porta, velocidade, timeout=2)
         estado_comunicacao = "Conectado"
         return True
-    except (serial.SerialException, OSError):
+    except (serial.SerialException, OSError) as error:
         conexao = None
         estado_comunicacao = "Falha: porta indisponivel"
+        print(error)
         return False
 
 
@@ -159,15 +161,20 @@ def enviar_ao_arduino(codigo):
         return
     try:
         conexao.write((codigo + "\n").encode())
+        conexao.flush()
     except (serial.SerialException, OSError):
         conexao = None
         estado_comunicacao = "Falha: Arduino desconectado"
 
 
 def processar_mensagem(mensagem):
-    """Recebe uma linha bruta do Arduino, limpa e executa se for um comando conhecido."""
     texto = mensagem.strip()
-    return executar(texto)              # texto desconhecido nao faz nada
+    if texto.startswith("DIGITO:"):
+        digito = texto[7:]
+        if len(digito) == 1 and digito.isdigit():
+            digitar(digito)
+        return None
+    return executar(texto)          
 
 
 def ler_arduino():
@@ -189,19 +196,18 @@ def ler_arduino():
 # ---------------------------------------------------------------
 
 def iniciar_aquisicao(porta):
-    """Comeca uma nova votacao: zera tudo e tenta conectar ao Arduino.
-    Se nao conseguir conectar, a votacao abre mesmo assim (modo teste, so pela tela)."""
     global aquisicao_ativa, numero_digitado, ultima_resposta
     zerar_votos()
     numero_digitado = ""
     ultima_resposta = ""
     conectar(porta)
     aquisicao_ativa = True
+    enviar_ao_arduino("INICIO")
 
 
 def parar_aquisicao():
-    """Interrompe a votacao e fecha a porta Serial. Os votos continuam na tela."""
     global aquisicao_ativa, numero_digitado
+    enviar_ao_arduino("PARADA")
     desconectar()
     aquisicao_ativa = False
     numero_digitado = ""
